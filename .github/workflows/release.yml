@@ -1,0 +1,110 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: build (${{ matrix.target }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            name: linux-x86_64
+            kind: unix
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            name: windows-x86_64
+            kind: windows
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            name: macos-aarch64
+            kind: unix
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            name: macos-x86_64
+            kind: unix
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Install Linux system libraries
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libxkbcommon-dev libx11-dev libwayland-dev
+
+      - name: Build release
+        run: cargo build --release --locked --target ${{ matrix.target }}
+
+      - name: Package (unix)
+        if: matrix.kind == 'unix'
+        shell: bash
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          OUT="nexus-pc-pro-${VERSION}-${{ matrix.name }}"
+          tar czf "${OUT}.tar.gz" -C "target/${{ matrix.target }}/release" nexus-pc-pro
+          sha256sum "${OUT}.tar.gz" > "${OUT}.tar.gz.sha256"
+
+      - name: Package (windows)
+        if: matrix.kind == 'windows'
+        shell: pwsh
+        run: |
+          $version = "${env:GITHUB_REF_NAME}" -replace '^v',''
+          $out = "nexus-pc-pro-$version-${{ matrix.name }}.exe"
+          Copy-Item "target/${{ matrix.target }}/release/nexus-pc-pro.exe" $out
+          (Get-FileHash $out -Algorithm SHA256).Hash + "  $out" | Out-File -Encoding ascii "$out.sha256"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-${{ matrix.name }}
+          path: |
+            nexus-pc-pro-*
+            !target
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          merge-multiple: true
+          path: dist
+
+      - name: Merge checksums
+        shell: bash
+        run: |
+          cd dist
+          cat *.sha256 > SHA256SUMS.txt
+          rm -f *.sha256
+          ls -la
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: NEXUS PC PRO ${GITHUB_REF_NAME#v}
+          body: |
+            Готовые сборки NEXUS PC PRO.
+
+            | Платформа | Файл |
+            |---|---|
+            | Windows x64 | `nexus-pc-pro-*.exe` |
+            | macOS Apple Silicon | `nexus-pc-pro-*-macos-aarch64.tar.gz` |
+            | macOS Intel | `nexus-pc-pro-*-macos-x86_64.tar.gz` |
+            | Linux x64 | `nexus-pc-pro-*-linux-x86_64.tar.gz` |
+
+            Контрольные суммы — в `SHA256SUMS.txt`. Сборка не подписана: на macOS выполните `xattr -cr nexus-pc-pro`, в Windows подтвердите запуск SmartScreen.
+          files: dist/*

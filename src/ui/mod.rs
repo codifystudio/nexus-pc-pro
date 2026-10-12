@@ -1,0 +1,11 @@
+pub mod about_page;
+pub mod cleaner_page;
+pub mod dashboard;
+pub mod disks_page;
+pub mod gpu_page;
+pub mod monitor_page;
+pub mod processes_page;
+pub mod scanner_page;
+pub mod settings_page;
+pub mod tools_page;
+pub mod widgets;

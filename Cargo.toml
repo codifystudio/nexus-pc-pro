@@ -1,0 +1,32 @@
+[package]
+name = "nexus-pc-pro"
+version = "9.6.0"
+edition = "2021"
+rust-version = "1.75"
+description = "NEXUS PC PRO - системный монитор и утилита обслуживания ПК"
+license = "MIT"
+
+[lib]
+name = "nexus_pc_pro"
+path = "src/lib.rs"
+
+[[bin]]
+name = "nexus-pc-pro"
+path = "src/main.rs"
+
+[dependencies]
+eframe = { version = "=0.27.2", default-features = false, features = ["default_fonts", "glow", "x11", "wayland"] }
+egui = "=0.27.2"
+egui_plot = "=0.27.0"
+sysinfo = "=0.30.13"
+wgpu = "0.19.4"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+dirs = "5"
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+strip = true
+panic = "abort"

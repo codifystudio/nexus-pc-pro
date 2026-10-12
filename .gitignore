@@ -1,0 +1,5 @@
+/target
+Cargo.lock.orig
+*.log
+.DS_Store
+Thumbs.db
